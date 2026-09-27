@@ -92,24 +92,35 @@ mergeBtn.addEventListener('click', async () => {
             outputFileName = folderName.replace(/\s+/g, '-') + '-printout.pdf';
         }
 
-        // --- 2. EXTRACT TEXT & CALL SECURE BACKEND (If checked) ---
+        // --- 2. SEND PDFs DIRECTLY TO GEMINI BACKEND (If checked) ---
         if (extractCheckbox.checked) {
-            statusText.textContent = "Extracting text from PDFs...";
+            statusText.textContent = "Preparing PDFs for AI analysis...";
             statusText.className = "mt-4 text-center text-sm font-medium text-purple-600 h-5";
             
-            let combinedText = '';
+            // Helper to convert an ArrayBuffer to a Base64 string
+            const arrayBufferToBase64 = (buffer) => {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return btoa(binary);
+            };
+
+            let pdfBase64Array = [];
+            
             for (let i = 0; i < pdfFilesToMerge.length; i++) {
                 const arrayBuffer = await pdfFilesToMerge[i].slice().arrayBuffer();
-                combinedText += `\n--- PDF ${i+1} ---\n`;
-                combinedText += await extractTextFromPDF(arrayBuffer);
+                pdfBase64Array.push(arrayBufferToBase64(arrayBuffer));
             }
 
-            statusText.textContent = "Analyzing with AI securely...";
+            statusText.textContent = "Analyzing PDFs with AI securely...";
             
+            // Send the Base64 array to Vercel
             const response = await fetch('/api/extract', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: combinedText })
+                body: JSON.stringify({ pdfFilesBase64: pdfBase64Array })
             });
 
             const aiData = await response.json();
@@ -126,7 +137,7 @@ mergeBtn.addEventListener('click', async () => {
 
             downloadCSV(aiData, 'upload_for_whatsapp_retarget.csv', [
                 { title: 'Name', key: 'FullName' },
-                { title: 'Phone no', key: 'PhoneNo' },
+                { title: 'Phone no', key: 'PhoneNo' }
             ]);
         }
 
