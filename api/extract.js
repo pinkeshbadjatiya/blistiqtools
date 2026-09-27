@@ -4,18 +4,22 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    // Now expecting an array of base64 strings instead of plain text
     const { pdfFilesBase64 } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) return res.status(500).json({ error: 'API key not configured.' });
     if (!pdfFilesBase64 || pdfFilesBase64.length === 0) return res.status(400).json({ error: 'No PDFs provided.' });
 
-    const promptText = `Extract the following details from the attached PDF documents for each order/customer found: Full Name, Phone No, Address, Order Source. 
-    Return the data STRICTLY as a JSON array of objects with the keys: "FullName", "PhoneNo", "Address", "OrderSource". 
-    If a detail is missing, leave the value as an empty string.`;
+    const promptText = `You are a data extraction assistant. Extract details from the attached PDF documents for each customer/order found: Full Name, Phone No, Address, Order Source.
 
-    // Build the parts array: First part is the prompt, followed by all the PDF files
+CRITICAL RULES:
+1. ONLY extract the RECIPIENT / CUSTOMER information (typically found under 'Deliver To', 'Ship To', 'Consignee', or 'Buyer Details').
+2. NEVER extract names, addresses, or phone numbers from "Shipped By", "From", "Sender", "Sold By", "Return Address", or courier/helpline sections.
+3. If the customer's phone number is not explicitly listed in their delivery/recipient section, leave "PhoneNo" as an empty string "". Under no circumstance should you fall back to or substitute the sender/shipper's phone number.
+4. If any other field (Full Name, Address, Order Source) is missing, leave that value as an empty string "".
+
+Return the data STRICTLY as a JSON array of objects with the exact keys: "FullName", "PhoneNo", "Address", "OrderSource".`;
+
     const parts = [{ text: promptText }];
     
     pdfFilesBase64.forEach(base64Data => {
@@ -28,7 +32,6 @@ export default async function handler(req, res) {
     });
 
     try {
-        // Note: Change 'gemini-3.8-flash' to whichever model version is active on your API key
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -39,10 +42,20 @@ export default async function handler(req, res) {
         });
 
         const data = await response.json();
+        
         if (!response.ok) throw new Error(data.error?.message || 'Gemini API Error');
 
         const extractedDetails = JSON.parse(data.candidates[0].content.parts[0].text);
-        return res.status(200).json(extractedDetails);
+        
+        // Ensure missing or null phone numbers default to empty strings
+        const cleanedDetails = extractedDetails.map(item => ({
+            FullName: item.FullName || '',
+            PhoneNo: item.PhoneNo || '',
+            Address: item.Address || '',
+            OrderSource: item.OrderSource || ''
+        }));
+
+        return res.status(200).json(cleanedDetails);
 
     } catch (error) {
         console.error("Extraction error:", error);
