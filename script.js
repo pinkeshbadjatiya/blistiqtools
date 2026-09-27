@@ -45,7 +45,6 @@ folderInput.addEventListener('change', () => {
 
 function downloadCSV(dataArray, filename, columns) {
     const header = columns.map(c => c.title).join(',') + '\n';
-    // Change this line inside downloadCSV:
     const rows = dataArray.map(obj => 
         columns.map(c => `"${String(obj[c.key] || '').replace(/"/g, '""')}"`).join(',')
     ).join('\n');
@@ -182,12 +181,13 @@ mergeBtn.addEventListener('click', async () => {
                     }
 
                     if (addBorder) {
-                        // Outline the exact boundary of the embedded page
+                        // Inset the border by 1 point so it safely prints without getting clipped
+                        const inset = 1; 
                         page.drawRectangle({
-                            x: offsetX,
-                            y: offsetY,
-                            width: drawWidth,
-                            height: drawHeight,
+                            x: offsetX + inset,
+                            y: offsetY + inset,
+                            width: drawWidth - (inset * 2),
+                            height: drawHeight - (inset * 2),
                             borderColor: rgb(0, 0, 0),
                             borderWidth: 1,
                         });
