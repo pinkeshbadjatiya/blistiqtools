@@ -1,19 +1,23 @@
 const fileInput = document.getElementById('file-input');
-const fileNameDisplay = document.getElementById('file-name');
+const fileList = document.getElementById('file-list');
 const convertBtn = document.getElementById('convert-btn');
 const statusText = document.getElementById('status');
 
+// Display selected files
 fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) {
-        fileNameDisplay.textContent = `Selected: ${fileInput.files[0].name}`;
-    } else {
-        fileNameDisplay.textContent = '';
-    }
+    fileList.innerHTML = '';
+    Array.from(fileInput.files).forEach(file => {
+        const li = document.createElement('li');
+        li.textContent = file.name;
+        fileList.appendChild(li);
+    });
 });
 
 convertBtn.addEventListener('click', async () => {
-    if (fileInput.files.length === 0) {
-        statusText.textContent = "Please select a PDF file first.";
+    const files = fileInput.files;
+
+    if (files.length === 0) {
+        statusText.textContent = "Please select at least one PDF file.";
         statusText.className = "mt-4 text-center text-sm font-medium text-red-600 h-5";
         return;
     }
@@ -25,25 +29,30 @@ convertBtn.addEventListener('click', async () => {
 
     try {
         const { PDFDocument, PageSizes } = PDFLib;
-        const file = fileInput.files[0];
-        const arrayBuffer = await file.arrayBuffer();
-        
-        const srcPdf = await PDFDocument.load(arrayBuffer);
         const outPdf = await PDFDocument.create();
         
-        const pages = srcPdf.getPages();
-        const embeddedPages = await outPdf.embedPages(pages);
-
         // A4 dimensions in points
         const A4_WIDTH = PageSizes.A4[0]; 
         const A4_HEIGHT = PageSizes.A4[1];
 
-        // Process 4 pages at a time
-        for (let i = 0; i < embeddedPages.length; i += 4) {
+        let allEmbeddedPages = [];
+
+        // 1. Loop through all selected files and collect their pages
+        for (let i = 0; i < files.length; i++) {
+            const arrayBuffer = await files[i].arrayBuffer();
+            const srcPdf = await PDFDocument.load(arrayBuffer);
+            const pages = srcPdf.getPages();
+            
+            // Embed pages into the new document directly from the source documents
+            const embedded = await outPdf.embedPages(pages);
+            allEmbeddedPages.push(...embedded);
+        }
+
+        // 2. Process all collected pages, 4 at a time
+        for (let i = 0; i < allEmbeddedPages.length; i += 4) {
             const newPage = outPdf.addPage([A4_WIDTH, A4_HEIGHT]);
 
             // Define the bottom-left origins for the 4 quadrants
-            // PDF coordinates start from bottom-left
             const positions = [
                 { x: 0, y: A4_HEIGHT / 2 },            // 1. Top-Left
                 { x: A4_WIDTH / 2, y: A4_HEIGHT / 2 }, // 2. Top-Right
@@ -52,8 +61,8 @@ convertBtn.addEventListener('click', async () => {
             ];
 
             for (let j = 0; j < 4; j++) {
-                if (i + j < embeddedPages.length) {
-                    const embed = embeddedPages[i + j];
+                if (i + j < allEmbeddedPages.length) {
+                    const embed = allEmbeddedPages[i + j];
                     
                     // Calculate scale to fit quadrant (with slight padding to prevent edges touching)
                     const padding = 10; 
@@ -88,7 +97,10 @@ convertBtn.addEventListener('click', async () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = file.name.replace('.pdf', '_4up.pdf');
+        
+        // Name the file differently depending on if 1 or multiple files were uploaded
+        a.download = files.length > 1 ? 'Merged_4up.pdf' : files[0].name.replace('.pdf', '_4up.pdf');
+        
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -98,7 +110,7 @@ convertBtn.addEventListener('click', async () => {
         statusText.className = "mt-4 text-center text-sm font-medium text-green-600 h-5";
     } catch (error) {
         console.error(error);
-        statusText.textContent = "An error occurred while processing the file.";
+        statusText.textContent = "An error occurred while processing the file(s).";
         statusText.className = "mt-4 text-center text-sm font-medium text-red-600 h-5";
     } finally {
         convertBtn.disabled = false;
