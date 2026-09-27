@@ -19,7 +19,7 @@
     <main class="p-6">
         <div class="max-w-xl mx-auto bg-white rounded-xl shadow-md p-8 mt-4">
             <h1 class="text-2xl font-bold text-gray-800 mb-2">4-in-1 PDF Maker</h1>
-            <p class="text-gray-600 mb-6 text-sm">Upload one or more PDFs. They will be merged and then shrunk to fit 4 pages onto a single A4 sheet.</p>
+            <p class="text-gray-600 mb-6 text-sm">Upload one or more PDFs. They will be shrunk to fit 4 pages onto a single A4 sheet.</p>
             
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Select PDF Files</label>
@@ -31,6 +31,12 @@
                     class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-md p-2"
                 >
                 <ul id="file-list" class="mt-3 text-sm text-gray-600 list-disc pl-5"></ul>
+                
+                <!-- NEW: Auto-fill checkbox -->
+                <div class="mt-4 flex items-center">
+                    <input type="checkbox" id="auto-fill" checked class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="auto-fill" class="ml-2 text-sm font-medium text-gray-700">Duplicate pages to fill the A4 sheet (Great for single-page flyers)</label>
+                </div>
             </div>
 
             <button 
