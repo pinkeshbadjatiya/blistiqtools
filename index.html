@@ -3,9 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blistiq Tools - PDF Merger</title>
+    <title>Blistiq Tools - PDF Merger & Extractor</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf-lib for merging -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- PDF.js for text extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
     
@@ -18,8 +24,8 @@
 
     <main class="p-6">
         <div class="max-w-xl mx-auto bg-white rounded-xl shadow-md p-8 mt-4">
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">PDF Merger Tool</h1>
-            <p class="text-gray-600 mb-6 text-sm">Combine multiple PDFs into a single file. You can pick specific files or select an entire folder.</p>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Merge & Extract Details</h1>
+            <p class="text-gray-600 mb-6 text-sm">Combine PDFs and optionally extract Customer Details to CSV using AI.</p>
             
             <div class="mb-6 flex flex-col md:flex-row gap-4">
                 <div class="flex-1">
@@ -46,14 +52,32 @@
 
             <div class="mb-6">
                 <p id="file-count" class="text-sm font-medium text-gray-800 mb-2"></p>
-                <ul id="file-list" class="text-sm text-gray-600 list-disc pl-5 max-h-48 overflow-y-auto"></ul>
+                <ul id="file-list" class="text-sm text-gray-600 list-disc pl-5 max-h-32 overflow-y-auto"></ul>
+            </div>
+
+            <!-- AI Extraction Settings -->
+            <div class="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <div class="flex items-center mb-3">
+                    <input type="checkbox" id="extract-data" class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
+                    <label for="extract-data" class="ml-2 text-sm font-bold text-purple-900">Extract Details to CSV (Uses Gemini API)</label>
+                </div>
+                <div id="api-key-container" class="hidden">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Gemini API Key</label>
+                    <input 
+                        type="password" 
+                        id="api-key" 
+                        placeholder="AIzaSy..." 
+                        class="w-full text-sm border border-gray-300 rounded-md p-2 focus:ring-purple-500 focus:border-purple-500"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Saved securely in your browser. <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 underline">Get one here</a>.</p>
+                </div>
             </div>
 
             <button 
                 id="merge-btn" 
                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200"
             >
-                Merge PDFs
+                Process PDFs
             </button>
 
             <div id="status" class="mt-4 text-center text-sm font-medium h-5"></div>
