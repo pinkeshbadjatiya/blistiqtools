@@ -2,6 +2,7 @@ const fileInput = document.getElementById('file-input');
 const fileList = document.getElementById('file-list');
 const convertBtn = document.getElementById('convert-btn');
 const statusText = document.getElementById('status');
+const autoFillCheckbox = document.getElementById('auto-fill'); // New checkbox reference
 
 // Display selected files
 fileInput.addEventListener('change', () => {
@@ -43,10 +44,28 @@ convertBtn.addEventListener('click', async () => {
             const srcPdf = await PDFDocument.load(arrayBuffer);
             const pages = srcPdf.getPages();
             
-            // Embed pages into the new document directly from the source documents
             const embedded = await outPdf.embedPages(pages);
             allEmbeddedPages.push(...embedded);
         }
+
+        // --- NEW AUTO-FILL LOGIC ---
+        // If the checkbox is checked, and we don't have enough pages to fill a sheet
+        if (autoFillCheckbox.checked && allEmbeddedPages.length > 0) {
+            if (allEmbeddedPages.length === 1) {
+                // If 1 page uploaded, duplicate it 4 times
+                allEmbeddedPages = [
+                    allEmbeddedPages[0], allEmbeddedPages[0], 
+                    allEmbeddedPages[0], allEmbeddedPages[0]
+                ];
+            } else if (allEmbeddedPages.length === 2) {
+                // If 2 pages uploaded, repeat them (Page 1, Page 2, Page 1, Page 2)
+                allEmbeddedPages = [
+                    allEmbeddedPages[0], allEmbeddedPages[1], 
+                    allEmbeddedPages[0], allEmbeddedPages[1]
+                ];
+            }
+        }
+        // ---------------------------
 
         // 2. Process all collected pages, 4 at a time
         for (let i = 0; i < allEmbeddedPages.length; i += 4) {
@@ -64,7 +83,6 @@ convertBtn.addEventListener('click', async () => {
                 if (i + j < allEmbeddedPages.length) {
                     const embed = allEmbeddedPages[i + j];
                     
-                    // Calculate scale to fit quadrant (with slight padding to prevent edges touching)
                     const padding = 10; 
                     const quadWidth = (A4_WIDTH / 2) - (padding * 2);
                     const quadHeight = (A4_HEIGHT / 2) - (padding * 2);
@@ -74,7 +92,6 @@ convertBtn.addEventListener('click', async () => {
                         quadHeight / embed.height
                     );
 
-                    // Center the scaled page inside its quadrant
                     const scaledWidth = embed.width * scale;
                     const scaledHeight = embed.height * scale;
                     const offsetX = ((A4_WIDTH / 2) - scaledWidth) / 2;
@@ -92,13 +109,11 @@ convertBtn.addEventListener('click', async () => {
 
         const outPdfBytes = await outPdf.save();
         
-        // Trigger download
         const blob = new Blob([outPdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         
-        // Name the file differently depending on if 1 or multiple files were uploaded
         a.download = files.length > 1 ? 'Merged_4up.pdf' : files[0].name.replace('.pdf', '_4up.pdf');
         
         document.body.appendChild(a);
