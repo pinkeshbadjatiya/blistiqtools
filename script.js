@@ -5,10 +5,11 @@ const fileCount = document.getElementById('file-count');
 const mergeBtn = document.getElementById('merge-btn');
 const statusText = document.getElementById('status');
 const extractCheckbox = document.getElementById('extract-data');
+const fitA4Checkbox = document.getElementById('fit-a4');
+const addBorderCheckbox = document.getElementById('add-border');
 
 let pdfFilesToMerge = [];
 
-// Update the UI list
 function updateFileList(files) {
     pdfFilesToMerge = files;
     fileList.innerHTML = '';
@@ -25,14 +26,12 @@ function updateFileList(files) {
     });
 }
 
-// Handle individual file selection
 fileInput.addEventListener('change', () => {
     folderInput.value = ''; 
     const files = Array.from(fileInput.files).filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
     updateFileList(files);
 });
 
-// Handle folder selection
 folderInput.addEventListener('change', () => {
     fileInput.value = ''; 
     let files = Array.from(folderInput.files).filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
@@ -44,19 +43,6 @@ folderInput.addEventListener('change', () => {
     updateFileList(files);
 });
 
-// Helper: Extract text from an ArrayBuffer using PDF.js
-async function extractTextFromPDF(arrayBuffer) {
-    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map(item => item.str).join(' ') + '\n';
-    }
-    return fullText;
-}
-
-// Helper: Download CSV
 function downloadCSV(dataArray, filename, columns) {
     const header = columns.map(c => c.title).join(',') + '\n';
     const rows = dataArray.map(obj => 
@@ -85,19 +71,17 @@ mergeBtn.addEventListener('click', async () => {
     mergeBtn.classList.add("opacity-50", "cursor-not-allowed");
 
     try {
-        // --- 1. DETERMINE OUTPUT FILENAME ---
         let outputFileName = 'Merged-printout.pdf';
         if (pdfFilesToMerge[0].webkitRelativePath) {
             const folderName = pdfFilesToMerge[0].webkitRelativePath.split('/')[0];
             outputFileName = folderName.replace(/\s+/g, '-') + '-printout.pdf';
         }
 
-        // --- 2. SEND PDFs DIRECTLY TO GEMINI BACKEND (If checked) ---
+        // AI Extraction
         if (extractCheckbox.checked) {
             statusText.textContent = "Preparing PDFs for AI analysis...";
             statusText.className = "mt-4 text-center text-sm font-medium text-purple-600 h-5";
             
-            // Helper to convert an ArrayBuffer to a Base64 string
             const arrayBufferToBase64 = (buffer) => {
                 let binary = '';
                 const bytes = new Uint8Array(buffer);
@@ -108,7 +92,6 @@ mergeBtn.addEventListener('click', async () => {
             };
 
             let pdfBase64Array = [];
-            
             for (let i = 0; i < pdfFilesToMerge.length; i++) {
                 const arrayBuffer = await pdfFilesToMerge[i].slice().arrayBuffer();
                 pdfBase64Array.push(arrayBufferToBase64(arrayBuffer));
@@ -116,7 +99,6 @@ mergeBtn.addEventListener('click', async () => {
 
             statusText.textContent = "Analyzing PDFs with AI securely...";
             
-            // Send the Base64 array to Vercel
             const response = await fetch('/api/extract', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -141,18 +123,76 @@ mergeBtn.addEventListener('click', async () => {
             ]);
         }
 
-        // --- 3. MERGE PDFs ---
-        statusText.textContent = "Merging PDFs... Please wait.";
+        // PDF Merging & Formatting
+        statusText.textContent = "Merging & Formatting PDFs... Please wait.";
         statusText.className = "mt-4 text-center text-sm font-medium text-blue-600 h-5";
 
-        const { PDFDocument } = PDFLib;
+        const { PDFDocument, PageSizes, rgb } = PDFLib;
         const mergedPdf = await PDFDocument.create();
+        
+        const fitA4 = fitA4Checkbox.checked;
+        const addBorder = addBorderCheckbox.checked;
 
         for (let i = 0; i < pdfFilesToMerge.length; i++) {
             const arrayBuffer = await pdfFilesToMerge[i].arrayBuffer();
             const pdf = await PDFDocument.load(arrayBuffer);
-            const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-            copiedPages.forEach((page) => mergedPdf.addPage(page));
+            
+            // Standard copy if formatting isn't requested
+            if (!fitA4 && !addBorder) {
+                const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                copiedPages.forEach((page) => mergedPdf.addPage(page));
+            } else {
+                // Apply specific scaling/border formatting
+                const pages = pdf.getPages();
+                const embeddedPages = await mergedPdf.embedPages(pages);
+                
+                embeddedPages.forEach(embed => {
+                    let page;
+                    let drawWidth = embed.width;
+                    let drawHeight = embed.height;
+                    let offsetX = 0;
+                    let offsetY = 0;
+
+                    if (fitA4) {
+                        page = mergedPdf.addPage(PageSizes.A4);
+                        // Scale uniformly to fit within A4
+                        const scale = Math.min(PageSizes.A4[0] / embed.width, PageSizes.A4[1] / embed.height);
+                        drawWidth = embed.width * scale;
+                        drawHeight = embed.height * scale;
+                        
+                        // Center on page
+                        offsetX = (PageSizes.A4[0] - drawWidth) / 2;
+                        offsetY = (PageSizes.A4[1] - drawHeight) / 2;
+
+                        page.drawPage(embed, {
+                            x: offsetX,
+                            y: offsetY,
+                            xScale: scale,
+                            yScale: scale
+                        });
+                    } else {
+                        page = mergedPdf.addPage([embed.width, embed.height]);
+                        page.drawPage(embed, {
+                            x: 0,
+                            y: 0,
+                            xScale: 1,
+                            yScale: 1
+                        });
+                    }
+
+                    if (addBorder) {
+                        // Outline the exact boundary of the embedded page
+                        page.drawRectangle({
+                            x: offsetX,
+                            y: offsetY,
+                            width: drawWidth,
+                            height: drawHeight,
+                            borderColor: rgb(0, 0, 0),
+                            borderWidth: 1,
+                        });
+                    }
+                });
+            }
         }
 
         const mergedPdfBytes = await mergedPdf.save();
