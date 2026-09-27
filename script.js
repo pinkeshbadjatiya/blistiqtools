@@ -126,7 +126,7 @@ mergeBtn.addEventListener('click', async () => {
 
             downloadCSV(aiData, 'upload_for_whatsapp_retarget.csv', [
                 { title: 'Name', key: 'FullName' },
-                { title: 'Phone no', key: 'PhoneNo' }
+                { title: 'Phone no', key: 'PhoneNo' },
             ]);
         }
 
