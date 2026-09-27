@@ -1,58 +1,51 @@
 // api/extract.js
 export default async function handler(req, res) {
-    // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { text } = req.body;
-    
-    // The API key is read securely from Vercel's Environment Variables
+    // Now expecting an array of base64 strings instead of plain text
+    const { pdfFilesBase64 } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!apiKey) {
-        return res.status(500).json({ error: 'API key is not configured on the server.' });
-    }
+    if (!apiKey) return res.status(500).json({ error: 'API key not configured.' });
+    if (!pdfFilesBase64 || pdfFilesBase64.length === 0) return res.status(400).json({ error: 'No PDFs provided.' });
 
-    if (!text || text.trim() === '') {
-        return res.status(400).json({ error: 'No text provided for analysis.' });
-    }
-
-    // Define the prompt instructing Gemini on exactly how to format the data
-    const prompt = `Extract the following details from the text below for each order/customer found: Full Name, Phone No, Address, Order Source. 
+    const promptText = `Extract the following details from the attached PDF documents for each order/customer found: Full Name, Phone No, Address, Order Source. 
     Return the data STRICTLY as a JSON array of objects with the keys: "FullName", "PhoneNo", "Address", "OrderSource". 
-    If a detail is missing, leave the value as an empty string. 
-    Text to analyze:
-    ${text}`;
+    If a detail is missing, leave the value as an empty string.`;
+
+    // Build the parts array: First part is the prompt, followed by all the PDF files
+    const parts = [{ text: promptText }];
+    
+    pdfFilesBase64.forEach(base64Data => {
+        parts.push({
+            inlineData: {
+                mimeType: "application/pdf",
+                data: base64Data
+            }
+        });
+    });
 
     try {
-        // Send the request to the Gemini API using gemini-3.8-flash
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
+        // Note: Change 'gemini-1.5-flash' to whichever model version is active on your API key
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { 
-                    response_mime_type: "application/json" 
-                }
+                contents: [{ parts: parts }],
+                generationConfig: { response_mime_type: "application/json" }
             })
         });
 
         const data = await response.json();
-        
-        // Handle Gemini API errors
-        if (!response.ok) {
-            throw new Error(data.error?.message || 'Gemini API Error');
-        }
+        if (!response.ok) throw new Error(data.error?.message || 'Gemini API Error');
 
-        // Parse the JSON string returned by Gemini into an actual object
         const extractedDetails = JSON.parse(data.candidates[0].content.parts[0].text);
-        
-        // Send the extracted JSON back to the frontend
         return res.status(200).json(extractedDetails);
 
     } catch (error) {
         console.error("Extraction error:", error);
-        return res.status(500).json({ error: error.message || 'Failed to process text' });
+        return res.status(500).json({ error: error.message || 'Failed to process PDFs' });
     }
 }
