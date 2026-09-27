@@ -28,8 +28,8 @@ export default async function handler(req, res) {
     });
 
     try {
-        // Note: Change 'gemini-1.5-flash' to whichever model version is active on your API key
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // Note: Change 'gemini-3-flash' to whichever model version is active on your API key
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
