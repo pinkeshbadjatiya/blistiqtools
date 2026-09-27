@@ -45,8 +45,9 @@ folderInput.addEventListener('change', () => {
 
 function downloadCSV(dataArray, filename, columns) {
     const header = columns.map(c => c.title).join(',') + '\n';
+    // Change this line inside downloadCSV:
     const rows = dataArray.map(obj => 
-        columns.map(c => `"${(obj[c.key] || '').replace(/"/g, '""')}"`).join(',')
+        columns.map(c => `"${String(obj[c.key] || '').replace(/"/g, '""')}"`).join(',')
     ).join('\n');
     
     const blob = new Blob([header + rows], { type: 'text/csv' });
